@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Выбор банка</title>
+    <title>Линк2Пэй - Ввод данных</title>
     <style>
+        /* Все стили остаются без изменений */
         * {
             margin: 0;
             padding: 0;
@@ -20,10 +21,9 @@
             margin: 0 auto;
         }
 
-        /* Общие стили для заголовков */
-       .screen-header {
+        .screen-header {
             display: flex;
-            justify-content: space-between; /* Равномерное распределение */
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
         }
@@ -36,7 +36,7 @@
             right: 0;
             text-align: center;
             margin: auto;
-            pointer-events: none; /* Чтобы клики проходили сквозь */
+            pointer-events: none;
         }
         .back-arrow {
             font-size: 24px;
@@ -45,7 +45,6 @@
             color: #3366ff;
         }
 
-        /* Стили для экрана выбора банка */
         #bank-selection-screen {
             display: block;
         }
@@ -92,7 +91,71 @@
             flex-grow: 1;
         }
 
-        /* Стили для экранов оплаты */
+        #tag-input-screen {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .tag-input-container {
+            margin-bottom: 20px;
+        }
+        .tag-input-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .tag-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .tag-input:focus {
+            outline: none;
+            border-color: #3366ff;
+        }
+        .tag-input::placeholder {
+            color: #999;
+        }
+        .tag-input.error {
+            border-color: #ff3b30;
+        }
+        .error-message {
+            color: #ff3b30;
+            font-size: 14px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .info-text {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 25px;
+        }
+        .continue-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #3366ff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .continue-btn:hover {
+            opacity: 0.9;
+        }
+
         .payment-screen {
             display: none;
             background: white;
@@ -141,7 +204,6 @@
             opacity: 0.9;
         }
 
-        /* Цветовые схемы для разных банков */
         .sbp-screen {
             border-top: 4px solid #886747;
         }
@@ -191,6 +253,50 @@
         .yellow-btn {
             background: #FF9900;
         }
+
+        .custom-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 300px;
+            width: 90%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .modal-message {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .modal-button {
+            padding: 10px 20px;
+            background: #3366ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .modal-button:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -206,49 +312,69 @@
 
         <div class="bank-list">
             <!-- СБПэй -->
-            <div class="bank-item" onclick="showPaymentScreen('sbp')">
+            <div class="bank-item" onclick="showTagInputScreen('sbp')">
                 <img src="СБП.png" class="bank-logo" alt="СБПэй">
                 <div class="bank-name">СБПэй</div>
             </div>
 
             <!-- Синий Банк -->
-            <div class="bank-item" onclick="showPaymentScreen('blue')">
+            <div class="bank-item" onclick="showTagInputScreen('blue')">
                 <img src="blue.png" class="bank-logo" alt="Синий Банк">
                 <div class="bank-name">Синий Банк</div>
             </div>
 
             <!-- Красный Банк -->
-            <div class="bank-item" onclick="showPaymentScreen('red')">
+            <div class="bank-item" onclick="showTagInputScreen('red')">
                 <img src="red.png" class="bank-logo" alt="Красный Банк">
                 <div class="bank-name">Красный Банк</div>
             </div>
 
             <!-- Зеленый Банк -->
-            <div class="bank-item" onclick="showPaymentScreen('green')">
+            <div class="bank-item" onclick="showTagInputScreen('green')">
                 <img src="green.png" class="bank-logo" alt="Зеленый Банк">
                 <div class="bank-name">Зеленый Банк</div>
             </div>
 
             <!-- Желтый Банк -->
-            <div class="bank-item" onclick="showPaymentScreen('yellow')">
+            <div class="bank-item" onclick="showTagInputScreen('yellow')">
                 <img src="yellow.png" class="bank-logo" alt="Желтый Банк">
                 <div class="bank-name">Желтый Банк</div>
             </div>
         </div>
     </div>
 
+    <!-- Экран ввода Telegram тега -->
+    <div id="tag-input-screen" class="payment-screen">
+        <div class="screen-header">
+            <div class="back-arrow" onclick="showBankSelection()">←</div>
+            <div class="screen-title">Ввод данных</div>
+        </div>
+        
+        <div class="tag-input-container">
+            <label class="tag-input-label">Введите свой тэг Телеграмм</label>
+            <input type="text" class="tag-input" id="telegram-tag" placeholder="@username">
+            <div class="error-message" id="tag-error">Пожалуйста, введите ваш Telegram тэг</div>
+        </div>
+        
+        <div class="info-text">
+            Данная страница необходима исключительно для работы прототипа. В дальнейшем ее не будет :)
+        </div>
+        
+        <button class="continue-btn" onclick="proceedToPayment()">Продолжить</button>
+    </div>
+
     <!-- Экран оплаты СБПэй -->
-     <div id="sbp-screen" class="payment-screen sbp-screen">
+    <div id="sbp-screen" class="payment-screen sbp-screen">
         <div class="screen-header">
             <div class="back-arrow" onclick="showBankSelection()">←</div>
             <div class="screen-title sbp-header">Приложение СБПэй</div>
         </div>
         <div class="recipient-info">
-            <span id="recipient-name">Загрузка...</span>
-            <span id="recipient-pam">Загрузка...</span>
+            <span id="sbp-recipient-name">Загрузка...</span>
+            <span id="sbp-recipient-pam">Загрузка...</span>
         </div>
-        <div class="amount" id="payment-amount">Загрузка...</div>
-        <div class="message" id="payment-message">Загрузка...</div>
+        <div class="amount" id="sbp-payment-amount">Загрузка...</div>
+        <div class="message" id="sbp-payment-message">Загрузка...</div>
         <button class="transfer-btn sbp-btn" onclick="makeTransfer('sbp')">Перевести</button>
     </div>
 
@@ -259,11 +385,11 @@
             <div class="screen-title blue-header">Синий Банк</div>
         </div>
         <div class="recipient-info">
-            <span id="recipient-name">Загрузка...</span>
-            <span id="recipient-pam">Загрузка...</span>
+            <span id="blue-recipient-name">Загрузка...</span>
+            <span id="blue-recipient-pam">Загрузка...</span>
         </div>
-        <div class="amount" id="payment-amount">Загрузка...</div>
-        <div class="message" id="payment-message">Загрузка...</div>
+        <div class="amount" id="blue-payment-amount">Загрузка...</div>
+        <div class="message" id="blue-payment-message">Загрузка...</div>
         <button class="transfer-btn blue-btn" onclick="makeTransfer('синий')">Перевести</button>
     </div>
 
@@ -274,11 +400,11 @@
             <div class="screen-title red-header">Красный Банк</div>
         </div>
         <div class="recipient-info">
-            <span id="recipient-name">Загрузка...</span>
-            <span id="recipient-pam">Загрузка...</span>
+            <span id="red-recipient-name">Загрузка...</span>
+            <span id="red-recipient-pam">Загрузка...</span>
         </div>
-        <div class="amount" id="payment-amount">Загрузка...</div>
-        <div class="message" id="payment-message">Загрузка...</div>
+        <div class="amount" id="red-payment-amount">Загрузка...</div>
+        <div class="message" id="red-payment-message">Загрузка...</div>
         <button class="transfer-btn red-btn" onclick="makeTransfer('красный')">Перевести</button>
     </div>
 
@@ -289,11 +415,11 @@
             <div class="screen-title green-header">Зеленый Банк</div>
         </div>
         <div class="recipient-info">
-            <span id="recipient-name">Загрузка...</span>
-            <span id="recipient-pam">Загрузка...</span>
+            <span id="green-recipient-name">Загрузка...</span>
+            <span id="green-recipient-pam">Загрузка...</span>
         </div>
-        <div class="amount" id="payment-amount">Загрузка...</div>
-        <div class="message" id="payment-message">Загрузка...</div>
+        <div class="amount" id="green-payment-amount">Загрузка...</div>
+        <div class="message" id="green-payment-message">Загрузка...</div>
         <button class="transfer-btn green-btn" onclick="makeTransfer('зеленый')">Перевести</button>
     </div>
 
@@ -304,71 +430,155 @@
             <div class="screen-title yellow-header">Желтый Банк</div>
         </div>
         <div class="recipient-info">
-            <span id="recipient-name">Загрузка...</span>
-            <span id="recipient-pam">Загрузка...</span>
+            <span id="yellow-recipient-name">Загрузка...</span>
+            <span id="yellow-recipient-pam">Загрузка...</span>
         </div>
-        <div class="amount" id="payment-amount">Загрузка...</div>
-        <div class="message" id="payment-message">Загрузка...</div>
+        <div class="amount" id="yellow-payment-amount">Загрузка...</div>
+        <div class="message" id="yellow-payment-message">Загрузка...</div>
         <button class="transfer-btn yellow-btn" onclick="makeTransfer('желтый')">Перевести</button>
     </div>
 
-<script>
-    // Показываем экран оплаты выбранного банка
-    function showPaymentScreen(bank) {
-        // Скрываем экран выбора банка
-        document.getElementById('bank-selection-screen').style.display = 'none';
+    <!-- Кастомное модальное окно -->
+    <div id="custom-modal" class="custom-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-title">Уведомление</div>
+            <div class="modal-message" id="modal-message"></div>
+            <button class="modal-button" onclick="hideModal()">ОК</button>
+        </div>
+    </div>
 
+<script>
+    let selectedBank = '';
+    let userTelegramTag = ''; // Глобальная переменная для хранения Telegram тега
+
+    // Показываем экран ввода тега
+    function showTagInputScreen(bank) {
+        selectedBank = bank;
+        document.getElementById('bank-selection-screen').style.display = 'none';
+        document.getElementById('tag-input-screen').style.display = 'block';
+        
+        // Сбрасываем состояние ошибки при открытии экрана
+        resetErrorState();
+    }
+
+    // Сбрасываем состояние ошибки
+    function resetErrorState() {
+        const tagInput = document.getElementById('telegram-tag');
+        const errorMessage = document.getElementById('tag-error');
+        
+        tagInput.classList.remove('error');
+        errorMessage.style.display = 'none';
+    }
+
+    // Переходим к экрану оплаты после ввода тега
+    function proceedToPayment() {
+        const telegramTag = document.getElementById('telegram-tag').value.trim();
+        const tagInput = document.getElementById('telegram-tag');
+        const errorMessage = document.getElementById('tag-error');
+        
+        // Проверяем, что поле не пустое
+        if (!telegramTag) {
+            tagInput.classList.add('error');
+            errorMessage.textContent = 'Пожалуйста, введите ваш Telegram тэг';
+            errorMessage.style.display = 'block';
+            return;
+        }
+        
+        // Проверяем, что тег начинается с @
+        if (!telegramTag.startsWith('@')) {
+            tagInput.classList.add('error');
+            errorMessage.textContent = 'Тег должен начинаться с символа @';
+            errorMessage.style.display = 'block';
+            return;
+        }
+        
+        // Сохраняем Telegram тег в глобальную переменную
+        userTelegramTag = telegramTag;
+        
+        // Здесь можно сохранить telegramTag или отправить на сервер
+        console.log('Telegram тег:', userTelegramTag);
+        
+        // Скрываем экран ввода тега
+        document.getElementById('tag-input-screen').style.display = 'none';
+        
         // Показываем выбранный экран оплаты
-        document.getElementById(`${bank}-screen`).style.display = 'block';
+        document.getElementById(`${selectedBank}-screen`).style.display = 'block';
     }
 
     // Возвращаемся к выбору банка
     function showBankSelection() {
-        // Скрываем все экраны оплаты
         document.querySelectorAll('.payment-screen').forEach(el => {
             el.style.display = 'none';
         });
-
-        // Показываем экран выбора банка
         document.getElementById('bank-selection-screen').style.display = 'block';
     }
 
-async function makeTransfer(bank) {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const linkId = urlParams.get('id');
-
-        if (!linkId) {
-            throw new Error('ID ссылки не найден');
-        }
-
-        // 1. Выполняем фоновый запрос для обновления статуса (если нужно)
-        await fetch(`http://193.33.153.154:8000/update_link_status/${linkId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
- // 2. Выводим в консоль информацию о переводе
-        const bankName = bank === 'sbp' ? 'СБПэй' : bank + ' банк';
-        console.log(`[ПЕРЕВОД УСПЕШЕН] Способ оплаты: ${bankName}, ID ссылки: ${linkId}, Время: ${new Date().toLocaleString()}`);
-
-        // 2. Показываем пользователю сообщение об успехе
-        alert(`Перевод через ${bank === 'sbp' ? 'СБПэй' : bank + ' банк'} выполнен!`);
-
-        // 3. Перенаправляем пользователя
-        window.location.href = 'https://t.me/Link2paybot';
-
-    } catch (error) {
-        console.error("Ошибка:", error);
-        alert(`Ошибка: ${error.message}`);
+    // Показать кастомное модальное окно
+    function showModal(title, message) {
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-message').textContent = message;
+        document.getElementById('custom-modal').style.display = 'flex';
     }
-}
+
+    // Скрыть кастомное модальное окно
+    function hideModal() {
+        document.getElementById('custom-modal').style.display = 'none';
+    }
+
+    async function makeTransfer(bank) {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const linkId = urlParams.get('id');
+
+            if (!linkId) {
+                showModal('Ошибка', 'ID ссылки не найден');
+                return;
+            }
+
+            // Отправляем запрос к бэкенду с данными о переводе
+            const response = await fetch(`http://193.33.153.154:8000/update_link_status/${linkId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    telegram_tag: userTelegramTag, // Передаем Telegram тег
+                    bank: bank, // Передаем выбранный банк
+                    timestamp: new Date().toISOString() // Добавляем временную метку
+                })
+            });
+
+            // Проверяем успешность запроса
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+
+            // Парсим ответ сервера
+            const result = await response.json();
+            
+            // Проверяем статус ответа от сервера
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Неизвестная ошибка сервера');
+            }
+
+            const bankName = bank === 'sbp' ? 'СБПэй' : bank + ' банк';
+            console.log(`[ПЕРЕВОД УСПЕШЕН] Способ оплаты: ${bankName}, ID ссылки: ${linkId}, Telegram тег: ${userTelegramTag}, Время: ${new Date().toLocaleString()}`);
+
+            showModal('Успешно', `Перевод через ${bank === 'sbp' ? 'СБПэй' : bank + ' банк'} выполнен!`);
+            
+            // Перенаправляем после закрытия модального окна
+            setTimeout(() => {
+                window.location.href = 'https://t.me/Link2paybot';
+            }, 1500);
+
+        } catch (error) {
+            console.error("Ошибка:", error);
+            showModal('Ошибка', `Не удалось завершить операцию: ${error.message}`);
+        }
+    }
 
     // Функция для отображения сообщения о использованной ссылке
     function showLinkUsedMessage() {
-        // Скрываем все элементы на странице
         document.body.innerHTML = `
             <div style="text-align: center; padding: 40px 20px;">
                 <h2 style="margin-bottom: 20px; color: #cc0000;">Эта платежная ссылка уже была использована</h2>
@@ -390,6 +600,7 @@ async function makeTransfer(bank) {
 
         if (!linkId) {
             console.error("ID ссылки не указан");
+            showModal('Ошибка', 'ID ссылки не указан');
             return;
         }
 
@@ -401,44 +612,28 @@ async function makeTransfer(bank) {
 
             const data = await response.json();
 
-            // Проверяем статус ссылки
             if (data.status === true) {
                 showLinkUsedMessage();
                 return;
             }
 
-            // Заполняем данные на всех экранах
-            document.querySelectorAll('.recipient-info span:nth-child(1)').forEach(el => {
-                el.textContent = `Получатель: ${data.pam}`;
-            });
-
-            document.querySelectorAll('.recipient-info span:nth-child(2)').forEach(el => {
-                el.textContent = `Телефон: ${data.phone_number}`;
-            });
-
-            document.querySelectorAll('.amount').forEach(el => {
-                el.textContent = `${data.amount} ₽`;
-            });
-
-            document.querySelectorAll('.message').forEach(el => {
-                el.textContent = `Сообщение: ${data.pay_message || 'Без сообщения'}`;
+            // Заполняем данные на всех экранах оплаты
+            const banks = ['sbp', 'blue', 'red', 'green', 'yellow'];
+            banks.forEach(bank => {
+                const nameElement = document.getElementById(`${bank}-recipient-name`);
+                const pamElement = document.getElementById(`${bank}-recipient-pam`);
+                const amountElement = document.getElementById(`${bank}-payment-amount`);
+                const messageElement = document.getElementById(`${bank}-payment-message`);
+                
+                if (nameElement) nameElement.textContent = `Получатель: ${data.pam}`;
+                if (pamElement) pamElement.textContent = `Телефон: ${data.phone_number}`;
+                if (amountElement) amountElement.textContent = `${data.amount} ₽`;
+                if (messageElement) messageElement.textContent = `Сообщение: ${data.pay_message || 'Без сообщения'}`;
             });
 
         } catch (error) {
             console.error("Ошибка:", error);
-            // Можно добавить отображение ошибки пользователю
-            document.body.innerHTML = `
-                <div style="text-align: center; padding: 40px 20px;">
-                    <h2 style="margin-bottom: 20px; color: #cc0000;">Ошибка загрузки данных</h2>
-                    <p style="margin-bottom: 30px; color: #666;">Не удалось загрузить данные платежа. Пожалуйста, попробуйте позже.</p>
-                    <button onclick="window.location.href = 'https://t.me/Link2paybot'"
-                            style="padding: 12px 24px; background: #3366ff; color: white;
-                                   border: none; border-radius: 8px; font-size: 16px;
-                                   cursor: pointer;">
-                        Закрыть
-                    </button>
-                </div>
-            `;
+            showModal('Ошибка', 'Не удалось загрузить данные платежа. Пожалуйста, попробуйте позже.');
         }
     }
 
@@ -446,7 +641,6 @@ async function makeTransfer(bank) {
     document.addEventListener('DOMContentLoaded', () => {
         loadPaymentData();
 
-        // Если есть ID в URL, сразу показываем экран выбора банка
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('id')) {
             showBankSelection();

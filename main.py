@@ -19,7 +19,7 @@ def run_api():
     """Запуск FastAPI"""
     try:
         logger.info("🚀 Starting FastAPI on http://193.33.153.154:8000")
-        uvicorn.run(app, host="host", port="port3", log_level="info")
+        uvicorn.run(app, host="193.33.153.154", port=8000, log_level="info")
     except Exception as e:
         logger.error(f"API error: {e}")
 

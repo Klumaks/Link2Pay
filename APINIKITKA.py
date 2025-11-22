@@ -1,3 +1,5 @@
+from models import get_transfer_by_link_id_from_link_db, update_payment_progress, get_payment_progress, get_transfer_id_by_link_id
+import traceback
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, constr
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,16 +9,15 @@ from typing import Optional
 import random
 import logging
 import requests
-import os  # <- ДОБАВЬТЕ ЭТОТ ИМПОРТ
-from dotenv import load_dotenv  # <- ДОБАВЬТЕ ЭТОТ ИМПОРТ
+import os
+from dotenv import load_dotenv
 
-load_dotenv()  # <- ДОБАВЬТЕ ЭТУ СТРОКУ
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-
 
 def send_telegram_notification(chat_id: int, message: str):
     """Отправляет уведомление через Telegram Bot API"""
@@ -42,28 +43,22 @@ def send_telegram_notification(chat_id: int, message: str):
         logger.error(f"Ошибка отправки Telegram уведомления: {str(e)}")
         return False
 
-
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://host:port", "http://host:port2"],
+    allow_origins=["http://193.33.153.154:5500", "http://localhost:5500"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # expose_headers=["Server"]  # Убираем стандартные заголовки
 )
-
 
 class RegistrationRequest(BaseModel):
     phone_number: str
     pam: str
 
-
 class PhoneRequest(BaseModel):
     phone: constr(pattern=r"^(\+7|8)\d{10}$")
 
-
-# Добавим новый класс для запроса на создание ссылки
 class CreateLinkRequest(BaseModel):
     account_recipient: constr(pattern=r"^\d{20}$")
     amount: int
@@ -72,8 +67,6 @@ class CreateLinkRequest(BaseModel):
     additionally: Optional[str] = None
     disposable: bool
 
-
-# Добавим модель для ответа с данными ссылки
 class LinkDataResponse(BaseModel):
     account_recipient: str
     amount: int
@@ -82,15 +75,13 @@ class LinkDataResponse(BaseModel):
     additionally: Optional[str]
     pam: str
     phone_number: str
-    status: bool  # Добавляем поле status
-
+    status: bool
 
 class TransferResponse(BaseModel):
     recipient: str
     payers: Optional[str]
     ammount: str
     details: Optional[str]
-
 
 def connect_to_db():
     try:
@@ -105,7 +96,6 @@ def connect_to_db():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
 
-
 def connect_to_db_link():
     try:
         conn = psycopg2.connect(
@@ -119,18 +109,13 @@ def connect_to_db_link():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
 
-
 def generate_random_account() -> str:
     """Генерация валидного 20-значного номера счета"""
     return ''.join(str(random.randint(0, 9)) for _ in range(20))
 
-
-# Добавляем новый класс для логов
 class LogData(BaseModel):
     link_id: int
 
-
-# Новый эндпоинт для обработки логов от бота
 @app.post("/log")
 async def handle_log(data: LogData):
     """Обработчик логов для уведомлений о переводах"""
@@ -173,7 +158,7 @@ async def handle_log(data: LogData):
 
         # Отправляем уведомление отправителю
         if cid_prs:
-            success_msg = f"✅ Перевод {recipient_username} успешен!"
+            success_msg = f"✅ Перевод @{recipient_username} успешен!"
             logger.info(f"Уведомление для {cid_prs}: {success_msg}")
 
         return {"status": "success"}
@@ -182,13 +167,11 @@ async def handle_log(data: LogData):
         logger.error(f"Ошибка в обработчике логов: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-
-# Вспомогательная функция для получения chat_id по username
 def get_chat_by_username(username: str) -> Optional[int]:
     """Получает chat_id по username из базы данных"""
     conn = None
     try:
-        conn = connect_to_db_link()  # Используем то же подключение, что и для transfer
+        conn = connect_to_db_link()
         with conn.cursor() as cursor:
             cursor.execute("SELECT chat_id FROM users WHERE username = %s", (username,))
             result = cursor.fetchone()
@@ -199,7 +182,6 @@ def get_chat_by_username(username: str) -> Optional[int]:
     finally:
         if conn:
             conn.close()
-
 
 @app.post("/regist_account")
 async def regist_account(request: RegistrationRequest):
@@ -243,7 +225,6 @@ async def regist_account(request: RegistrationRequest):
             if conn:
                 conn.close()
 
-
 def find_account_by_phone(phone_number: str) -> str:
     """Поиск номера счета по номеру телефона в PostgreSQL"""
     conn = None
@@ -257,13 +238,12 @@ def find_account_by_phone(phone_number: str) -> str:
                 raise HTTPException(status_code=404, detail="Account not found")
             return result[0]
     except HTTPException:
-        raise  # Пробрасываем HTTPException дальше
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
     finally:
         if conn:
             conn.close()
-
 
 @app.post("/get_account")
 def get_account(request: PhoneRequest):
@@ -271,6 +251,8 @@ def get_account(request: PhoneRequest):
     phone_normalized = request.phone
     if phone_normalized.startswith("+7"):
         phone_normalized = "8" + phone_normalized[2:]
+    elif phone_normalized.startswith("7"):
+        phone_normalized = "8" + phone_normalized[1:]
 
     try:
         account = find_account_by_phone(phone_normalized)
@@ -280,7 +262,6 @@ def get_account(request: PhoneRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/create_link")
 def create_payment_link(request: CreateLinkRequest):
     """Создает платежную ссылку и возвращает ее"""
@@ -289,8 +270,8 @@ def create_payment_link(request: CreateLinkRequest):
         conn = connect_to_db()
         with conn.cursor() as cursor:
             query = sql.SQL("""
-                INSERT INTO links 
-                (account_recipient, amount, bank_recipient, 
+                INSERT INTO links
+                (account_recipient, amount, bank_recipient,
                  pay_message, additionally, disposable, status)
                 VALUES (%s, %s, %s, %s, %s, %s, FALSE)
                 RETURNING id
@@ -317,20 +298,18 @@ def create_payment_link(request: CreateLinkRequest):
         if conn:
             conn.close()
 
-
-# Обновляем endpoint
 @app.get("/get_link_data/{link_id}", response_model=LinkDataResponse)
 def get_link_data(link_id: int):
     """Получает данные платежа по ID ссылки"""
     conn = None
-    print("dfb")
+    print(f"🔍 ДЕБАГ: get_link_data для link_id={link_id}")
     try:
         conn = connect_to_db()
         with conn.cursor() as cursor:
             query = sql.SQL("""
-                SELECT l.account_recipient, l.amount, l.bank_recipient, 
+                SELECT l.account_recipient, l.amount, l.bank_recipient,
                        l.pay_message, l.additionally, a.pam, a.phone_number,
-                       l.status
+                       l.status, l.disposable
                 FROM links l
                 JOIN account a ON l.account_recipient = a.account
                 WHERE l.id = %s
@@ -341,6 +320,41 @@ def get_link_data(link_id: int):
             if not result:
                 raise HTTPException(status_code=404, detail="Link not found")
 
+            status = result[7]
+            disposable = result[8]
+            print(f"🔍 ДЕБАГ: status={status}, disposable={disposable}")
+
+            # 🔴 ИСПРАВЛЕНИЕ: Для открытых сборов НЕ проверяем прогресс при первоначальном запросе
+            # Открытые сборы всегда должны начинаться с активной ссылки
+            if not status:
+                transfer_data = get_transfer_by_link_id_from_link_db(link_id)
+                payers_str = transfer_data.get('payers', '') if transfer_data else ''
+                is_collective = payers_str and ',' in payers_str
+                is_open_collection = payers_str == ''  # Пустой список плательщиков = открытый сбор
+
+                print(f"🔍 ДЕБАГ: is_collective={is_collective}, is_open_collection={is_open_collection}, payers_str='{payers_str}'")
+
+                # 🔴 ИСПРАВЛЕНИЕ: Для открытых сборов НЕ проверяем завершенность при первом запросе
+                if is_collective:  # Только для обычных коллективных сборов
+                    transfer_id = get_transfer_id_by_link_id(link_id)
+                    if transfer_id:
+                        progress_info = get_payment_progress(transfer_id)
+                        if progress_info and progress_info['is_completed']:
+                            print(f"🔍 ДЕБАГ: Коллективный сбор завершен, но статус ссылки FALSE")
+                            return LinkDataResponse(
+                                account_recipient=result[0],
+                                amount=result[1],
+                                bank_recipient=result[2],
+                                pay_message=result[3],
+                                additionally=result[4],
+                                pam=result[5],
+                                phone_number=result[6],
+                                status=True
+                            )
+                # 🔴 ДОБАВЛЕНО: Для открытых сборов оставляем статус как есть
+                elif is_open_collection:
+                    print(f"🔍 ДЕБАГ: Открытый сбор - оставляем исходный статус {status}")
+
             return LinkDataResponse(
                 account_recipient=result[0],
                 amount=result[1],
@@ -349,141 +363,331 @@ def get_link_data(link_id: int):
                 additionally=result[4],
                 pam=result[5],
                 phone_number=result[6],
-                status=result[7]
+                status=status
             )
 
     except Exception as e:
+        print(f"🔍 ДЕБАГ: Ошибка в get_link_data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
         if conn:
             conn.close()
 
-
 @app.post("/update_link_status/{link_id}")
-def update_link_status(link_id: int):
+def update_link_status(link_id: int, request_data: dict = None):
     """Обновляет статус ссылки и логирует перевод"""
     conn = None
     try:
+        print(f"🔍 ДЕБАГ: Начало update_link_status, link_id={link_id}, request_data={request_data}")
+
+        # Получаем данные из запроса (если есть)
+        telegram_tag = None
+        bank = None
+        if request_data:
+            telegram_tag = request_data.get('telegram_tag')
+            bank = request_data.get('bank')
+
+        print(f"🔍 ДЕБАГ: telegram_tag={telegram_tag}, bank={bank}")
+
         conn = connect_to_db()
         with conn.cursor() as cursor:
             # Получаем информацию о ссылке
             cursor.execute("""
-                SELECT account_recipient, amount, bank_recipient, 
-                       pay_message, disposable, status 
+                SELECT account_recipient, amount, bank_recipient,
+                       pay_message, disposable, status
                 FROM links WHERE id = %s FOR UPDATE
             """, (link_id,))
             link_data = cursor.fetchone()
 
             if not link_data:
+                print(f"🔍 ДЕБАГ: Ссылка не найдена")
                 raise HTTPException(status_code=404, detail="Ссылка не найдена")
 
-            account, amount, bank, message, disposable, status = link_data
+            account, amount, bank_recipient, message, disposable, status = link_data
+            print(f"🔍 ДЕБАГ: link_data: account={account}, amount={amount}, status={status}, disposable={disposable}")
 
-            # Проверяем не использована ли уже ссылка
-            if status and disposable:
-                raise HTTPException(status_code=400, detail="Ссылка уже использована")
+            # Получаем информацию о переводе для определения типа
+            transfer_data = get_transfer_by_link_id_from_link_db(link_id)
+            payers_str = transfer_data.get('payers', '') if transfer_data else ''
+            is_collective = payers_str and ',' in payers_str
+            is_open_collection = payers_str == ''  # Пустой список плательщиков = открытый сбор
 
-            # Если ссылка одноразовая - обновляем статус
-            if disposable:
-                cursor.execute("""
-                    UPDATE links SET status = TRUE WHERE id = %s
-                """, (link_id,))
+            print(f"🔍 ДЕБАГ: is_collective = {is_collective}, is_open_collection = {is_open_collection}, payers_str = '{payers_str}'")
+
+            # 🔴 РЕАЛЬНАЯ ЛОГИКА ОБРАБОТКИ ССЫЛОК
+            if is_collective or is_open_collection:
+                # КОЛЛЕКТИВНЫЙ ИЛИ ОТКРЫТЫЙ СБОР - умная логика
+                transfer_id = get_transfer_id_by_link_id(link_id)
+                print(f"🔍 ДЕБАГ: Коллективный/открытый сбор, transfer_id={transfer_id}")
+
+                if transfer_id:
+                    progress_info = get_payment_progress(transfer_id)
+                    print(f"🔍 ДЕБАГ: Прогресс сбора: {progress_info}")
+
+                    if progress_info:
+                        if is_open_collection:
+                            print(f"🔍 ДЕБАГ: Открытый сбор - игнорируем is_completed")
+                        elif progress_info['is_completed']:
+                            print(f"🔍 ДЕБАГ: Коллективный сбор завершен, ссылка недействительна")
+                            raise HTTPException(status_code=400, detail="Сбор уже завершен")
+                        else:
+                            # Сбор еще не завершен - обновляем прогресс
+                            print(f"🔍 ДЕБАГ: Сбор НЕ завершен, обновляем прогресс")
+                    else:
+                        print(f"🔍 ДЕБАГ: Не удалось получить прогресс, проверяем статус ссылки")
+                        if status:
+                            raise HTTPException(status_code=400, detail="Ссылка уже использована")
+                else:
+                    print(f"🔍 ДЕБАГ: Не найден transfer_id, проверяем статус ссылки")
+                    if status:
+                        raise HTTPException(status_code=400, detail="Ссылка уже использована")
+            else:
+                # ОДИНОЧНЫЙ ПЕРЕВОД - стандартная логика
+                print(f"🔍 ДЕБАГ: Одиночный перевод, проверяем статус")
+                if status:
+                    print(f"🔍 ДЕБАГ: Ссылка УЖЕ использована")
+                    raise HTTPException(status_code=400, detail="Ссылка уже использована")
+
+            # 🔴 РЕАЛЬНОЕ ОБНОВЛЕНИЕ СТАТУСА ССЫЛКИ
+            if not (is_collective or is_open_collection):
+                # Одиночные переводы - сразу закрываем
+                print(f"🔍 ДЕБАГ: Закрываем одиночную ссылку")
+                cursor.execute("UPDATE links SET status = TRUE WHERE id = %s", (link_id,))
                 conn.commit()
+            else:
+                # Коллективные/открытые сборы - проверяем, не пора ли закрыть
+                transfer_id = get_transfer_id_by_link_id(link_id)
+                if transfer_id:
+                    progress_info = get_payment_progress(transfer_id)
+                    if progress_info and progress_info['is_completed']:
+                        print(f"🔍 ДЕБАГ: Все оплатили! Закрываем ссылку")
+                        cursor.execute("UPDATE links SET status = TRUE WHERE id = %s", (link_id,))
+                        conn.commit()
+                    else:
+                        print(f"🔍 ДЕБАГ: Еще не все оплатили, оставляем ссылку активной")
+                else:
+                    print(f"🔍 ДЕБАГ: Не найден transfer_id, оставляем ссылку как есть")
 
             # Логируем в консоль сервера
             log_data = {
                 "link_id": link_id,
+                "telegram_tag": telegram_tag,
+                "bank": bank,
+                "is_collective": is_collective,
+                "is_open_collection": is_open_collection,
+                "amount": amount
             }
-            print(f"Отправка лога в бот: {log_data}")
+            print(f"💰 ОПЛАТА УСПЕШНА: {log_data}")
 
-            # Получаем информацию о переводе для уведомлений
-            transfer_data = get_transfer_by_link_id_from_link_db(link_id)
+            # 🔴 ДОБАВЛЯЕМ ПЛАТЕЛЬЩИКА В СТАТИСТИКУ ДЛЯ ОТКРЫТЫХ СБОРОВ
+            if is_open_collection and telegram_tag and transfer_id:
+                try:
+                    conn_link = connect_to_db_link()
+                    with conn_link.cursor() as cursor_link:
+                        # Получаем текущих плательщиков
+                        cursor_link.execute("SELECT payers FROM transfer WHERE id = %s", (transfer_id,))
+                        result = cursor_link.fetchone()
+                        current_payers = result[0] if result and result[0] else ""
+
+                        # Добавляем нового плательщика
+                        payer_username = telegram_tag.lstrip('@')
+                        if current_payers:
+                            # Проверяем, не добавлен ли уже этот плательщик
+                            existing_payers = [p.strip() for p in current_payers.split(',')]
+                            if payer_username not in existing_payers:
+                                updated_payers = current_payers + f", {payer_username}"
+                            else:
+                                updated_payers = current_payers
+                        else:
+                            updated_payers = payer_username
+
+                        # Обновляем только если изменились плательщики
+                        if updated_payers != current_payers:
+                            cursor_link.execute(
+                                "UPDATE transfer SET payers = %s WHERE id = %s",
+                                (updated_payers, transfer_id)
+                            )
+                            conn_link.commit()
+                            print(f"🔍 ДЕБАГ: Добавлен плательщик {payer_username} в открытый сбор {transfer_id}")
+                        else:
+                            print(f"🔍 ДЕБАГ: Плательщик {payer_username} уже есть в открытом сборе {transfer_id}")
+
+                except Exception as e:
+                    print(f"🔍 ДЕБАГ: Ошибка добавления плательщика: {str(e)}")
+                finally:
+                    if conn_link:
+                        conn_link.close()
+
+            # 🔴 ОТПРАВЛЯЕМ УВЕДОМЛЕНИЯ (после обновления статистики)
             if transfer_data and 'recipient' in transfer_data:
-                # Отправляем уведомление получателю
-                send_transfer_notifications(transfer_data, amount, message)
-            return {"success": True}
+                transfer_id = get_transfer_id_by_link_id(link_id)
 
+                if transfer_id:
+                    # Обогащаем данные для уведомлений
+                    transfer_data['link_id'] = link_id
+                    transfer_data['id'] = transfer_id
+
+                    print(f"🔍 ДЕБАГ: Отправляем уведомления с полными данными")
+                    send_transfer_notifications(
+                        transfer_data=transfer_data,
+                        amount=str(amount),
+                        message=message,
+                        telegram_tag=telegram_tag,
+                        bank=bank
+                    )
+                else:
+                    print(f"🔍 ДЕБАГ: Отправляем уведомления без прогресса")
+                    send_transfer_notifications(transfer_data, str(amount), message, telegram_tag, bank)
+            else:
+                print(f"🔍 ДЕБАГ: Нет данных перевода для уведомлений")
+
+            print(f"🔍 ДЕБАГ: Успешное завершение обработки оплаты")
+            return {
+                "status": "success",
+                "message": "Перевод выполнен успешно",
+                "link_id": link_id,
+                "is_collective": is_collective,
+                "is_open_collection": is_open_collection,
+                "amount": amount
+            }
+
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"🔍 ДЕБАГ: ОШИБКА в update_link_status: {str(e)}")
+        print(f"🔍 ДЕБАГ: Traceback: {traceback.format_exc()}")
         if conn:
             conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
     finally:
         if conn:
             conn.close()
 
 
-def get_transfer_by_link_id_from_link_db(link_id: int):
-    """Получает данные перевода из базы link2pay"""
-    conn = None
-    try:
-        conn = connect_to_db_link()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT recipient, payers, ammount, details
-                FROM transfer
-                WHERE id_link = %s
-            """, (str(link_id),))
-            result = cursor.fetchone()
-
-            if result:
-                return {
-                    'recipient': result[0],
-                    'payers': result[1],
-                    'amount': result[2],
-                    'details': result[3]
-                }
-            return None
-    except Exception as e:
-        logger.error(f"Ошибка получения данных перевода: {str(e)}")
-        return None
-    finally:
-        if conn:
-            conn.close()
-
-
-def send_transfer_notifications(transfer_data: dict, amount: str, message: str):
-    """Отправляет уведомления о переводе"""
+def send_transfer_notifications(transfer_data: dict, amount: str, message: str, telegram_tag: str = None, bank: str = None):
+    """Отправляет уведомления о переводе с прогрессом"""
     try:
         # Получаем chat_id получателя
         recipient_username = transfer_data.get('recipient')
         recipient_chat_id = get_chat_by_username(recipient_username)
 
+        # Получаем информацию о плательщиках
+        payers_str = transfer_data.get('payers', '')
+        transfer_id = transfer_data.get('id')
+        link_id = transfer_data.get('link_id')
+
+        # Определяем тип сбора
+        is_collective = payers_str and ',' in payers_str
+        is_open_collection = payers_str == ''  # Пустой список плательщиков = открытый сбор
+
+        print(f"🔍 ДЕБАГ: Тип сбора - коллективный: {is_collective}, открытый: {is_open_collection}")
+
+        # Обновляем прогресс платежа (если это не открытый сбор)
+        if (is_collective or is_open_collection) and telegram_tag and transfer_id and link_id:
+            payer_username = telegram_tag.lstrip('@')
+            update_payment_progress(transfer_id, link_id, payer_username, float(amount))
+
+        # Получаем актуальный прогресс
+        progress_info = None
+        if (is_collective or is_open_collection) and transfer_id:
+            progress_info = get_payment_progress(transfer_id)
+
+        # ВОССТАНАВЛИВАЕМ ЭМОДЗИ ДЛЯ УВЕДОМЛЕНИЙ
+        message_with_emoji = message
+        if message == "За ресторан":
+            message_with_emoji = "🍽️ За ресторан"
+        elif message == "За такси":
+            message_with_emoji = "🚕 За такси"
+        elif message == "На подарок":
+            message_with_emoji = "🎁 На подарок" 
+        elif message == "Возврат долга":
+            message_with_emoji = "💰 Возврат долга"
+        elif message == "На карманные расходы":
+            message_with_emoji = "💸 На карманные расходы"
+
         # Отправляем уведомление получателю
         if recipient_chat_id:
-            notification_text = f"💸 Вам перевод {amount} ₽\n"
+            if is_open_collection and progress_info:
+                # Уведомление для открытого сбора
+                notification_text = f"💸 Поступил перевод в открытый сбор\n"
+                notification_text += f"От: {telegram_tag}\n"
+                notification_text += f"Сумма: {amount} ₽\n\n"
 
-            payers = transfer_data.get('payers', '')
-            if payers:
-                notification_text += f"От: @{payers}\n"
+                notification_text += f"📊 Прогресс открытого сбора:\n"
+                notification_text += f"• Собрано: {progress_info['actual_amount']} ₽\n"
+                notification_text += f"• Участников: {progress_info['actual_payers']}\n"
 
+                if progress_info['paid_users']:
+                    notification_text += "\n✅ Участники:\n"
+                    for paid_user in progress_info['paid_users']:
+                        notification_text += f"• @{paid_user['username']} - {paid_user['amount']} ₽\n"
+
+            elif is_collective and progress_info:
+                # Уведомление для коллективного сбора
+                notification_text = f"💸 Поступила часть сбора\n"
+                notification_text += f"От: {telegram_tag}\n"
+                notification_text += f"Сумма: {amount} ₽\n\n"
+
+                notification_text += f"📊 Прогресс сбора:\n"
+                notification_text += f"• Цель: {progress_info['target_amount']} ₽ ({progress_info['amount_per_payer']} ₽ с каждого)\n"
+                notification_text += f"• Собрано: {progress_info['actual_amount']} ₽\n"
+                notification_text += f"• Прогресс: {progress_info['progress_percent']}%\n"
+                notification_text += f"• Оплатили: {progress_info['actual_payers']}/{progress_info['total_payers']}\n\n"
+
+                if progress_info['paid_users']:
+                    notification_text += "✅ Оплатили:\n"
+                    for paid_user in progress_info['paid_users']:
+                        notification_text += f"• @{paid_user['username']} - {paid_user['amount']} ₽\n"
+
+                if progress_info['unpaid_payers']:
+                    notification_text += f"\n⏳ Ожидаем:\n"
+                    for unpaid_user in progress_info['unpaid_payers']:
+                        notification_text += f"• @{unpaid_user}\n"
+
+                if progress_info['is_completed']:
+                    notification_text += f"\n🎉 Сбор завершен! Все средства получены."
+
+            else:
+                # Обычное уведомление для одиночного перевода
+                notification_text = f"💸 Вам перевод {amount} ₽\n"
+                if telegram_tag:
+                    notification_text += f"От: {telegram_tag}\n"
+                elif payers_str:
+                    notification_text += f"От: @{payers_str}\n"
+
+            # ИСПОЛЬЗУЕМ СООБЩЕНИЕ С ЭМОДЗИ
             details = transfer_data.get('details')
             if details:
-                notification_text += f"Сообщение: {details}"
+                # Восстанавливаем эмодзи для деталей перевода
+                details_with_emoji = details
+                if details == "За ресторан":
+                    details_with_emoji = "🍽️ За ресторан"
+                elif details == "За такси":
+                    details_with_emoji = "🚕 За такси"
+                elif details == "На подарок":
+                    details_with_emoji = "🎁 На подарок" 
+                elif details == "Возврат долга":
+                    details_with_emoji = "💰 Возврат долга"
+                elif details == "На карманные расходы":
+                    details_with_emoji = "💸 На карманные расходы"
+                    
+                notification_text += f"\nСообщение: {details_with_emoji}"
 
             send_telegram_notification(recipient_chat_id, notification_text)
             logger.info(f"Уведомление отправлено получателю {recipient_username}")
 
-        # Отправляем уведомления отправителям (для запросов)
-        payers_str = transfer_data.get('payers', '')
-        if payers_str and ',' in payers_str:
-            # Это запрос с несколькими плательщиками
-            payer_usernames = [p.strip() for p in payers_str.split(',')]
-            for payer_username in payer_usernames:
-                payer_chat_id = get_chat_by_username(payer_username)
-                if payer_chat_id:
-                    success_text = f"✅ Перевод {recipient_username} успешен!"
-                    send_telegram_notification(payer_chat_id, success_text)
+        # Отправляем уведомление тому, кто оплатил
+        if telegram_tag:
+            payer_tag = telegram_tag.lstrip('@')
+            payer_chat_id = get_chat_by_username(payer_tag)
+            if payer_chat_id:
+                success_text = f"✅ Перевод @{recipient_username} успешен!\n"
+                send_telegram_notification(payer_chat_id, success_text)
+                logger.info(f"Уведомление отправлено отправителю {payer_tag}")
 
     except Exception as e:
         logger.error(f"Ошибка отправки уведомлений: {str(e)}")
 
-
-# APINIKITKA.py
-
-# Добавляем новый класс для ответа
-
-
-# Новый эндпоинт
 @app.get("/get_transfer_by_link/{id_link}", response_model=TransferResponse)
 def get_transfer_by_link(id_link: str):
     """Получает данные перевода по id_link"""
