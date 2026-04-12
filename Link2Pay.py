@@ -1,22 +1,32 @@
-import os
-import re
 import telebot
 from telebot import types
 from dotenv import load_dotenv
-
+import socks  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
+import os
 from database import db, User
 from models import SendFlow, RequestFlow, registr_account_by_phone, checkDisposable, get_transfer_info, get_confirm
 
 from urllib.parse import urlparse, parse_qs
 
+# Загружаем переменные окружения
 load_dotenv()
+
+# НАСТРОЙКА ПРОКСИ (правильный способ для telebot)
+from telebot import apihelper
+
+# Настройка прокси для всех запросов telebot
+apihelper.proxy = {
+    'https': 'socks5://dd4482437e89f9af8929514eee7faaf61f@proxy99.madapp.cc:443'
+}
+
+# Создаем бота
 bot = telebot.TeleBot(os.getenv('TELEGRAM_BOT_TOKEN'))
 BOT_USERNAME = bot.get_me().username
 
 def send_transfer_warning(cid: int, other_username: str, amount: str, is_request: bool = False):
     """
     Отправляет предупреждение о первом переводе между пользователями
-    
+
     Args:
         cid: chat_id пользователя, которому отправляется предупреждение
         other_username: username второго участника перевода
@@ -27,16 +37,16 @@ def send_transfer_warning(cid: int, other_username: str, amount: str, is_request
         user = db.get_user_by_chat(cid)
         if not user or not user.username:
             return
-            
+
         sender_username = user.username
-        
+
         # Пропускаем проверку если это один и тот же пользователь
         if sender_username == other_username:
             return
-            
+
         # Проверяем историю переводов
         has_previous = db.has_previous_transfers(sender_username, other_username)
-        
+
         if not has_previous:
             if is_request:
                 warning_text = (
@@ -52,10 +62,10 @@ def send_transfer_warning(cid: int, other_username: str, amount: str, is_request
                     f"но у вас еще не было переводов с этим человеком.\n\n"
                     f"<i>Рекомендуем убедиться в надежности получателя перед переводом.</i>"
                 )
-            
+
             bot.send_message(cid, warning_text, parse_mode='HTML')
             print(f"Предупреждение отправлено {sender_username} о первом переводе с {other_username}")
-            
+
     except Exception as e:
         print(f"Ошибка при отправке предупреждения: {str(e)}")
 
@@ -140,7 +150,8 @@ def confirm_reg(call: types.CallbackQuery):
             phone= "8" + phone[2:]
         elif phone.startswith("7"):
             phone= "8" + phone[1:]
-        user = User(chat_id=cid, username=u.username or '', name=name, phone=phone)
+        user = User(chat_id=cid, username=u.username or '', name=name, phone=phone,
+    messenger_type='telegram' )
         db.save_user(user)
         registr_account_by_phone(phone, name)
         awaiting_reg.discard(cid)
@@ -178,9 +189,9 @@ def send_flow(m: types.Message):
                 return bot.send_message(cid, "❌ Сумма должна быть больше 0.")
         except ValueError:
             return bot.send_message(cid, "❌ Неверный формат суммы.")
-            
+
         f.amount, f.step = text, 'message'
-        
+
         # СОЗДАЕМ КЛАВИАТУРУ С КНОПКАМИ ЦЕЛЕЙ
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
         kb.add(
@@ -192,16 +203,16 @@ def send_flow(m: types.Message):
             types.KeyboardButton("✏️ Другое...")
         )
         kb.add("Без сообщения")
-        
+
         return bot.send_message(
-            cid, 
-            "Выберите цель перевода или введите своё сообщение:", 
+            cid,
+            "Выберите цель перевода или введите своё сообщение:",
             reply_markup=kb
         )
 
     if f.step == 'message':
         # Обрабатываем выбор из кнопок
-        if text in ["🍽️ За ресторан", "🚕 За такси", "🎁 На подарок", 
+        if text in ["🍽️ За ресторан", "🚕 За такси", "🎁 На подарок",
                    "💰 Возврат долга", "💸 На карманные расходы"]:
             f.details = text
         elif text == "✏️ Другое...":
@@ -215,22 +226,22 @@ def send_flow(m: types.Message):
         else:
             # Пользователь ввел свое сообщение
             f.details = text
-            
+
         if len(f.details) > 200:
             return bot.send_message(cid, "❌ Сообщение слишком длинное.")
-            
+
         f.step = 'confirm'
         kb = types.InlineKeyboardMarkup()
         kb.add(
             types.InlineKeyboardButton("✅ Подтвердить", callback_data='send_ok'),
             types.InlineKeyboardButton("✏️ Изменить",   callback_data='send_edit')
         )
-        
+
         # Формируем сообщение подтверждения
         message_text = f"Проверьте данные:\nПолучатель: @{f.recipient}\nСумма: {f.amount} ₽"
         if f.details:
             message_text += f"\nСообщение: {f.details}"
-            
+
         bot.send_message(cid, message_text, reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data in ('send_ok', 'send_edit'))
@@ -307,7 +318,7 @@ def req_start(call: types.CallbackQuery):
     cid = call.message.chat.id
     refresh_username(cid, call.from_user.username or '')
     request_state[cid] = RequestFlow(chat_id=cid)
-    
+
     try:
         bot.answer_callback_query(call.id)
     except Exception as e:
@@ -315,25 +326,25 @@ def req_start(call: types.CallbackQuery):
             print(f"Игнорируем устаревший callback query: {call.id}")
         else:
             raise
-    
+
     # Создаем клавиатуру с кнопкой открытого сбора
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📢 Создать открытый сбор", callback_data='open_collection'))
-    
+
     bot.send_message(cid, "Введите @username плательщиков через пробел:", reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data == 'open_collection')
 def create_open_collection(call: types.CallbackQuery):
     cid = call.message.chat.id
     f = request_state.get(cid)
-    
+
     if f:
         f.is_open_collection = True
         f.payers = []  # Пустой список для открытого сбора
         f.step = 'amount'
-        
+
         bot.send_message(cid, "✅ Создан открытый сбор. Укажите сумму с каждого участника (>0):")
-    
+
     bot.answer_callback_query(call.id)
 
 
@@ -347,7 +358,7 @@ def req_flow(m: types.Message):
         if f.is_open_collection:
             f.step = 'amount'
             return bot.send_message(cid, "Укажите сумму с каждого участника (>0):")
-            
+
         users = [u[1:] for u in text.split() if is_valid_username(u)]
         if not users:
             return bot.send_message(cid, "❌ Некорректные @username.")
@@ -361,9 +372,9 @@ def req_flow(m: types.Message):
                 return bot.send_message(cid, "❌ Сумма должна быть больше 0.")
         except ValueError:
             return bot.send_message(cid, "❌ Неверный формат суммы.")
-            
+
         f.amount, f.step = text, 'message'
-        
+
         # СОЗДАЕМ КЛАВИАТУРУ С КНОПКАМИ ЦЕЛЕЙ ДЛЯ ЗАПРОСОВ
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
         kb.add(
@@ -375,16 +386,16 @@ def req_flow(m: types.Message):
             types.KeyboardButton("✏️ Другое...")
         )
         kb.add("Без сообщения")
-        
+
         return bot.send_message(
-            cid, 
-            "Выберите цель запроса или введите своё сообщение:", 
+            cid,
+            "Выберите цель запроса или введите своё сообщение:",
             reply_markup=kb
         )
 
     if f.step == 'message':
         # Обрабатываем выбор из кнопок (такая же логика как в send_flow)
-        if text in ["🍽️ За ресторан", "🚕 За такси", "🎁 На подарок", 
+        if text in ["🍽️ За ресторан", "🚕 За такси", "🎁 На подарок",
                    "💰 Возврат долга", "💸 На карманные расходы"]:
             f.details = text
         elif text == "✏️ Другое...":
@@ -396,26 +407,26 @@ def req_flow(m: types.Message):
             f.details = ''
         else:
             f.details = text
-            
+
         if len(f.details) > 200:
             return bot.send_message(cid, "❌ Сообщение слишком длинное.")
-            
+
         f.step = 'confirm'
         kb = types.InlineKeyboardMarkup()
         kb.add(
             types.InlineKeyboardButton("✅ Подтвердить", callback_data='req_ok'),
             types.InlineKeyboardButton("✏️ Изменить",   callback_data='req_edit')
         )
-        
+
         # Формируем сообщение подтверждения в зависимости от типа сбора
         if f.is_open_collection:
             message_text = f"📢 Открытый сбор\nСумма с каждого: {f.amount} ₽"
         else:
             message_text = f"Плательщики: {', '.join('@'+u for u in f.payers)}\nСумма с каждого: {f.amount} ₽"
-            
+
         if f.details:
             message_text += f"\nСообщение: {f.details}"
-            
+
         bot.send_message(cid, f"Проверьте данные:\n{message_text}", reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data in ('req_ok', 'req_edit'))
@@ -428,14 +439,14 @@ def req_confirm(call: types.CallbackQuery):
     if call.data == 'req_ok':
         requester = db.get_user_by_chat(cid)
         requester_name = f"{requester.username}" if requester and requester.username else "Отправитель запроса"
-        
+
         # 🔴 ОБРАБОТКА ОТКРЫТЫХ СБОРОВ
         if f.is_open_collection:
             try:
                 # Для открытых сборов создаем многоразовую ссылку
                 disposable = False  # Многоразовая ссылка для открытых сборов
                 link = f.generate_link(requester_name, disposable)
-                
+
                 parsed_url = urlparse(link)
                 query_params = parse_qs(parsed_url.query)
                 link_id = int(query_params.get('id', [None])[0])
@@ -448,7 +459,7 @@ def req_confirm(call: types.CallbackQuery):
                     details=f.details,
                     link_id=link_id
                 )
-                
+
                 # Показываем ссылку создателю
                 if f.details:
                     msg_text = (f"📢 Открытый сбор создан!\n"
@@ -477,7 +488,7 @@ def req_confirm(call: types.CallbackQuery):
                     "Попробуйте позже или обратитесь в поддержку.",
                     reply_markup=types.ReplyKeyboardRemove()
                 )
-        
+
         else:
             # СУЩЕСТВУЮЩАЯ ЛОГИКА для обычных сборов
             for payer_username in f.payers:
@@ -488,7 +499,7 @@ def req_confirm(call: types.CallbackQuery):
             sent, not_reg, errors = [], [], []
             disposable = checkDisposable(f.payers)
             link = f.generate_link(requester_name, disposable)
-            
+
             parsed_url = urlparse(link)
             query_params = parse_qs(parsed_url.query)
             link_id = int(query_params.get('id', [None])[0])
@@ -500,7 +511,7 @@ def req_confirm(call: types.CallbackQuery):
                 details=f.details,
                 link_id=link_id
             )
-            
+
             for u in f.payers:
                 chat_id = db.get_chat_by_username(u)
                 if chat_id:
@@ -525,7 +536,7 @@ def req_confirm(call: types.CallbackQuery):
                         errors.append(f"@{u}: {str(e)}")
                 else:
                     not_reg.append(f"@{u}")
-                    
+
             # Формируем отчет пользователю
             report = []
             if sent:
@@ -560,7 +571,7 @@ def req_confirm(call: types.CallbackQuery):
                 bot.send_message(cid, "📢 Ваша реклама здесь! Свяжитесь с нами для размещения.")
         request_state.pop(cid)
         show_main_menu(cid)
-        
+
     else:  # edit
         request_state[cid] = RequestFlow(chat_id=cid)
         bot.send_message(cid, "✏️ Введите @username заново:",

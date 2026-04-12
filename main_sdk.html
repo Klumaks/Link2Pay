@@ -349,17 +349,17 @@
             <div class="back-arrow" onclick="showBankSelection()">←</div>
             <div class="screen-title">Ввод данных</div>
         </div>
-        
+
         <div class="tag-input-container">
             <label class="tag-input-label">Введите свой тэг Телеграмм</label>
             <input type="text" class="tag-input" id="telegram-tag" placeholder="@username">
             <div class="error-message" id="tag-error">Пожалуйста, введите ваш Telegram тэг</div>
         </div>
-        
+
         <div class="info-text">
             Данная страница необходима исключительно для работы прототипа. В дальнейшем ее не будет :)
         </div>
-        
+
         <button class="continue-btn" onclick="proceedToPayment()">Продолжить</button>
     </div>
 
@@ -450,13 +450,14 @@
 <script>
     let selectedBank = '';
     let userTelegramTag = ''; // Глобальная переменная для хранения Telegram тега
+    const API_BASE = 'http://212.233.98.238:8000';
 
     // Показываем экран ввода тега
     function showTagInputScreen(bank) {
         selectedBank = bank;
         document.getElementById('bank-selection-screen').style.display = 'none';
         document.getElementById('tag-input-screen').style.display = 'block';
-        
+
         // Сбрасываем состояние ошибки при открытии экрана
         resetErrorState();
     }
@@ -465,7 +466,7 @@
     function resetErrorState() {
         const tagInput = document.getElementById('telegram-tag');
         const errorMessage = document.getElementById('tag-error');
-        
+
         tagInput.classList.remove('error');
         errorMessage.style.display = 'none';
     }
@@ -475,7 +476,7 @@
         const telegramTag = document.getElementById('telegram-tag').value.trim();
         const tagInput = document.getElementById('telegram-tag');
         const errorMessage = document.getElementById('tag-error');
-        
+
         // Проверяем, что поле не пустое
         if (!telegramTag) {
             tagInput.classList.add('error');
@@ -483,7 +484,7 @@
             errorMessage.style.display = 'block';
             return;
         }
-        
+
         // Проверяем, что тег начинается с @
         if (!telegramTag.startsWith('@')) {
             tagInput.classList.add('error');
@@ -491,16 +492,16 @@
             errorMessage.style.display = 'block';
             return;
         }
-        
+
         // Сохраняем Telegram тег в глобальную переменную
         userTelegramTag = telegramTag;
-        
+
         // Здесь можно сохранить telegramTag или отправить на сервер
         console.log('Telegram тег:', userTelegramTag);
-        
+
         // Скрываем экран ввода тега
         document.getElementById('tag-input-screen').style.display = 'none';
-        
+
         // Показываем выбранный экран оплаты
         document.getElementById(`${selectedBank}-screen`).style.display = 'block';
     }
@@ -536,7 +537,7 @@
             }
 
             // Отправляем запрос к бэкенду с данными о переводе
-            const response = await fetch(`http://193.33.153.154:8000/update_link_status/${linkId}`, {
+            const response = await fetch(`${API_BASE}/update_link_status/${linkId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -555,7 +556,7 @@
 
             // Парсим ответ сервера
             const result = await response.json();
-            
+
             // Проверяем статус ответа от сервера
             if (result.status !== 'success') {
                 throw new Error(result.message || 'Неизвестная ошибка сервера');
@@ -565,7 +566,7 @@
             console.log(`[ПЕРЕВОД УСПЕШЕН] Способ оплаты: ${bankName}, ID ссылки: ${linkId}, Telegram тег: ${userTelegramTag}, Время: ${new Date().toLocaleString()}`);
 
             showModal('Успешно', `Перевод через ${bank === 'sbp' ? 'СБПэй' : bank + ' банк'} выполнен!`);
-            
+
             // Перенаправляем после закрытия модального окна
             setTimeout(() => {
                 window.location.href = 'https://t.me/Link2paybot';
@@ -605,7 +606,7 @@
         }
 
         try {
-            const response = await fetch(`http://193.33.153.154:8000/get_link_data/${linkId}`);
+            const response = await fetch(`${API_BASE}/get_link_data/${linkId}`);
             if (!response.ok) {
                 throw new Error('Ошибка загрузки данных');
             }
@@ -624,7 +625,7 @@
                 const pamElement = document.getElementById(`${bank}-recipient-pam`);
                 const amountElement = document.getElementById(`${bank}-payment-amount`);
                 const messageElement = document.getElementById(`${bank}-payment-message`);
-                
+
                 if (nameElement) nameElement.textContent = `Получатель: ${data.pam}`;
                 if (pamElement) pamElement.textContent = `Телефон: ${data.phone_number}`;
                 if (amountElement) amountElement.textContent = `${data.amount} ₽`;

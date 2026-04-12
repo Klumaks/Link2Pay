@@ -5,29 +5,29 @@ from database import db
 import json
 from urllib.parse import quote_plus
 
-APINIKITKA_BASE_URL = 'http://193.33.153.154:8000'  # Замените на ваш URL API
+APINIKITKA_BASE_URL = '212.233.98.238:8000''  # Замените на ваш URL API
 
 def clean_message_for_api(message: str) -> str:
     """Очищает сообщение от эмодзи для API"""
     if not message:
         return None
-    
+
     # Убираем эмодзи из предустановленных целей
     emoji_cleanup = {
         "🍽️ За ресторан": "За ресторан",
-        "🚕 За такси": "За такси", 
+        "🚕 За такси": "За такси",
         "🎁 На подарок": "На подарок",
         "💰 Возврат долга": "Возврат долга",
         "💸 На карманные расходы": "На карманные расходы"
     }
-    
+
     return emoji_cleanup.get(message, message)
 
 def get_transfer_info(link_id: str) -> dict:
     """Запрашивает данные перевода по API"""
     try:
         response = requests.get(
-            f"http://193.33.153.154:8000/get_transfer_by_link/{link_id}",
+            f"http://{APINIKITKA_BASE_URL}:8000/get_transfer_by_link/{link_id}",
             timeout=5
         )
         response.raise_for_status()
@@ -55,7 +55,7 @@ def registr_account_by_phone(phone_number: str, pam: str):
         }
         headers = {"Content-Type": "application/json"}
         response = requests.post(
-            "http://193.33.153.154:8000/regist_account",
+            f"http://{APINIKITKA_BASE_URL}:8000/regist_account",
             data=json.dumps(payload),
             headers=headers
         )
@@ -96,7 +96,7 @@ class SendFlow:
 
             # Получаем реквизиты счета
             account_response = requests.post(
-                f"http://193.33.153.154:8000/get_account",
+                f"http://{APINIKITKA_BASE_URL}:8000/get_account",
                 json={"phone": phone},
                 timeout=10
             )
@@ -120,7 +120,7 @@ class SendFlow:
             headers = {"Content-Type": "application/json"}
 
             response = requests.post(
-                "http://193.33.153.154:8000/create_link",
+                f"http://{APINIKITKA_BASE_URL}:8000/create_link",
                 data=json.dumps(payload),
                 headers=headers
             )
@@ -171,7 +171,7 @@ class RequestFlow:
 
             # Общая логика получения счета
             account_response = requests.post(
-                f"http://193.33.153.154:8000/get_account",
+                f"http://{APINIKITKA_BASE_URL}:8000/get_account",
                 json={"phone": phone},
                 timeout=10
             )
@@ -204,7 +204,7 @@ class RequestFlow:
             headers = {"Content-Type": "application/json"}
 
             response = requests.post(
-                "http://193.33.153.154:8000/create_link",
+                f"http://{APINIKITKA_BASE_URL}:8000/create_link",
                 data=json.dumps(payload),
                 headers=headers
             )
@@ -219,7 +219,7 @@ class RequestFlow:
 
 def get_confirm(link_id, cid, dest):
     requests.post(
-        "http://193.33.153.154:5001/log",
+        f"http://{APINIKITKA_BASE_URL}:5001/log",
         json={
             "link_id": link_id,
             "cid": cid,
@@ -273,7 +273,7 @@ def get_payment_progress(transfer_id: int):
 
         # 🔴 ИСПРАВЛЕНИЕ: Корректно определяем тип сбора
         is_open_collection = (payers_str is None or payers_str.strip() == '')
-        
+
         if is_open_collection:
             # 🔴 ОТКРЫТЫЙ СБОР: всегда активен, пока не закрыт вручную
             # Получаем информацию об оплативших
@@ -399,3 +399,27 @@ def get_transfer_by_link_id_from_link_db(link_id: int):
     except Exception as e:
         print(f"Ошибка получения данных перевода: {str(e)}")
         return None
+
+def send_vk_notification(chat_id: int, message: str):
+    """Отправляет уведомление через VK Bot API"""
+    try:
+        vk_token = os.getenv('VK_BOT_TOKEN')
+        if not vk_token:
+            logger.error("VK_BOT_TOKEN не найден")
+            return False
+
+        # Импортируем vk_api здесь, чтобы избежать циклических импортов
+        import vk_api
+        vk_session = vk_api.VkApi(token=vk_token)
+        vk = vk_session.get_api()
+
+        vk.messages.send(
+            peer_id=chat_id,
+            message=message,
+            random_id=0
+        )
+        logger.info(f"VK уведомление отправлено в chat_id: {chat_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка отправки VK уведомления: {str(e)}")
+        return False

@@ -11,6 +11,7 @@ import logging
 import requests
 import os
 from dotenv import load_dotenv
+import vk_api  # Добавить в импорты
 
 load_dotenv()
 
@@ -43,10 +44,89 @@ def send_telegram_notification(chat_id: int, message: str):
         logger.error(f"Ошибка отправки Telegram уведомления: {str(e)}")
         return False
 
+def send_vk_notification(chat_id: int, message: str):
+    """Отправляет уведомление через VK Bot API"""
+    try:
+        vk_token = os.getenv('VK_BOT_TOKEN')
+        if not vk_token:
+            logger.error("VK_BOT_TOKEN не найден")
+            return False
+
+        import vk_api
+        vk_session = vk_api.VkApi(token=vk_token)
+        vk = vk_session.get_api()
+
+        vk.messages.send(
+            peer_id=chat_id,
+            message=message,
+            random_id=0
+        )
+        logger.info(f"VK уведомление отправлено в chat_id: {chat_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка отправки VK уведомления: {str(e)}")
+        return False
+def format_notification_text(transfer_data: dict, amount: str, message: str, telegram_tag: str = None) -> str:
+    """Форматирует текст уведомления"""
+    payers_str = transfer_data.get('payers', '')
+
+    if telegram_tag:
+        return f"💸 Вам перевод {amount} ₽\nОт: {telegram_tag}"
+    elif payers_str:
+        return f"💸 Вам перевод {amount} ₽\nОт: @{payers_str}"
+    else:
+        return f"💸 Вам перевод {amount} ₽"
+
+def send_transfer_notifications(transfer_data: dict, amount: str, message: str, telegram_tag: str = None, bank: str = None):
+    """Отправляет уведомления о переводе с прогрессом"""
+    try:
+        recipient_username = transfer_data.get('recipient')
+        recipient_chat_id = get_chat_by_username(recipient_username)
+
+        if recipient_chat_id:
+            notification_text = format_notification_text(transfer_data, amount, message, telegram_tag)
+
+            from database import db
+            recipient_user = db.get_user_by_chat(recipient_chat_id)
+
+            if recipient_user:
+                # 🔴 ИСПОЛЬЗУЕМ messenger_type для определения куда отправлять
+                if recipient_user.messenger_type == 'vk':
+                    send_vk_notification(recipient_chat_id, notification_text)
+                else:
+                    send_telegram_notification(recipient_chat_id, notification_text)
+            else:
+                # fallback: пробуем оба
+                send_telegram_notification(recipient_chat_id, notification_text)
+                send_vk_notification(recipient_chat_id, notification_text)
+
+            logger.info(f"Уведомление отправлено получателю {recipient_username}")
+
+        # Отправляем уведомление тому, кто оплатил
+        if telegram_tag:
+            payer_tag = telegram_tag.lstrip('@')
+            payer_chat_id = get_chat_by_username(payer_tag)
+            if payer_chat_id:
+                success_text = f"✅ Перевод @{recipient_username} успешен!"
+
+                from database import db
+                payer_user = db.get_user_by_chat(payer_chat_id)
+
+                if payer_user and payer_user.messenger_type == 'vk':
+                    send_vk_notification(payer_chat_id, success_text)
+                else:
+                    send_telegram_notification(payer_chat_id, success_text)
+
+                logger.info(f"Уведомление отправлено отправителю {payer_tag}")
+
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомлений: {str(e)}")
+        import traceback
+        traceback.print_exc()
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://193.33.153.154:5500", "http://localhost:5500"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,14 +163,16 @@ class TransferResponse(BaseModel):
     ammount: str
     details: Optional[str]
 
+# APINIKITKA.py (исправленная часть)
+
 def connect_to_db():
     try:
         conn = psycopg2.connect(
-            dbname="name",
-            user="postgres",
-            password="password",
-            host="host",
-            port="dbPort"
+            dbname='opkc',
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASS', 'password'),
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=os.getenv('DB_PORT', '5432')
         )
         return conn
     except Exception as e:
@@ -100,15 +182,14 @@ def connect_to_db_link():
     try:
         conn = psycopg2.connect(
             dbname="link2pay",
-            user="postgres",
-            password="password",
-            host="host",
-            port="dbPort"
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASS', 'password'),
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=os.getenv('DB_PORT', '5432')
         )
         return conn
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
-
 def generate_random_account() -> str:
     """Генерация валидного 20-значного номера счета"""
     return ''.join(str(random.randint(0, 9)) for _ in range(20))
@@ -288,7 +369,7 @@ def create_payment_link(request: CreateLinkRequest):
             link_id = cursor.fetchone()[0]
             conn.commit()
 
-            return f"http://193.33.153.154:5500/main_sdk.html?id={link_id}"
+            return f"http://212.233.98.238:8001/main_sdk.html?id={link_id}"
 
     except Exception as e:
         if conn:
@@ -564,129 +645,6 @@ def update_link_status(link_id: int, request_data: dict = None):
             conn.close()
 
 
-def send_transfer_notifications(transfer_data: dict, amount: str, message: str, telegram_tag: str = None, bank: str = None):
-    """Отправляет уведомления о переводе с прогрессом"""
-    try:
-        # Получаем chat_id получателя
-        recipient_username = transfer_data.get('recipient')
-        recipient_chat_id = get_chat_by_username(recipient_username)
-
-        # Получаем информацию о плательщиках
-        payers_str = transfer_data.get('payers', '')
-        transfer_id = transfer_data.get('id')
-        link_id = transfer_data.get('link_id')
-
-        # Определяем тип сбора
-        is_collective = payers_str and ',' in payers_str
-        is_open_collection = payers_str == ''  # Пустой список плательщиков = открытый сбор
-
-        print(f"🔍 ДЕБАГ: Тип сбора - коллективный: {is_collective}, открытый: {is_open_collection}")
-
-        # Обновляем прогресс платежа (если это не открытый сбор)
-        if (is_collective or is_open_collection) and telegram_tag and transfer_id and link_id:
-            payer_username = telegram_tag.lstrip('@')
-            update_payment_progress(transfer_id, link_id, payer_username, float(amount))
-
-        # Получаем актуальный прогресс
-        progress_info = None
-        if (is_collective or is_open_collection) and transfer_id:
-            progress_info = get_payment_progress(transfer_id)
-
-        # ВОССТАНАВЛИВАЕМ ЭМОДЗИ ДЛЯ УВЕДОМЛЕНИЙ
-        message_with_emoji = message
-        if message == "За ресторан":
-            message_with_emoji = "🍽️ За ресторан"
-        elif message == "За такси":
-            message_with_emoji = "🚕 За такси"
-        elif message == "На подарок":
-            message_with_emoji = "🎁 На подарок" 
-        elif message == "Возврат долга":
-            message_with_emoji = "💰 Возврат долга"
-        elif message == "На карманные расходы":
-            message_with_emoji = "💸 На карманные расходы"
-
-        # Отправляем уведомление получателю
-        if recipient_chat_id:
-            if is_open_collection and progress_info:
-                # Уведомление для открытого сбора
-                notification_text = f"💸 Поступил перевод в открытый сбор\n"
-                notification_text += f"От: {telegram_tag}\n"
-                notification_text += f"Сумма: {amount} ₽\n\n"
-
-                notification_text += f"📊 Прогресс открытого сбора:\n"
-                notification_text += f"• Собрано: {progress_info['actual_amount']} ₽\n"
-                notification_text += f"• Участников: {progress_info['actual_payers']}\n"
-
-                if progress_info['paid_users']:
-                    notification_text += "\n✅ Участники:\n"
-                    for paid_user in progress_info['paid_users']:
-                        notification_text += f"• @{paid_user['username']} - {paid_user['amount']} ₽\n"
-
-            elif is_collective and progress_info:
-                # Уведомление для коллективного сбора
-                notification_text = f"💸 Поступила часть сбора\n"
-                notification_text += f"От: {telegram_tag}\n"
-                notification_text += f"Сумма: {amount} ₽\n\n"
-
-                notification_text += f"📊 Прогресс сбора:\n"
-                notification_text += f"• Цель: {progress_info['target_amount']} ₽ ({progress_info['amount_per_payer']} ₽ с каждого)\n"
-                notification_text += f"• Собрано: {progress_info['actual_amount']} ₽\n"
-                notification_text += f"• Прогресс: {progress_info['progress_percent']}%\n"
-                notification_text += f"• Оплатили: {progress_info['actual_payers']}/{progress_info['total_payers']}\n\n"
-
-                if progress_info['paid_users']:
-                    notification_text += "✅ Оплатили:\n"
-                    for paid_user in progress_info['paid_users']:
-                        notification_text += f"• @{paid_user['username']} - {paid_user['amount']} ₽\n"
-
-                if progress_info['unpaid_payers']:
-                    notification_text += f"\n⏳ Ожидаем:\n"
-                    for unpaid_user in progress_info['unpaid_payers']:
-                        notification_text += f"• @{unpaid_user}\n"
-
-                if progress_info['is_completed']:
-                    notification_text += f"\n🎉 Сбор завершен! Все средства получены."
-
-            else:
-                # Обычное уведомление для одиночного перевода
-                notification_text = f"💸 Вам перевод {amount} ₽\n"
-                if telegram_tag:
-                    notification_text += f"От: {telegram_tag}\n"
-                elif payers_str:
-                    notification_text += f"От: @{payers_str}\n"
-
-            # ИСПОЛЬЗУЕМ СООБЩЕНИЕ С ЭМОДЗИ
-            details = transfer_data.get('details')
-            if details:
-                # Восстанавливаем эмодзи для деталей перевода
-                details_with_emoji = details
-                if details == "За ресторан":
-                    details_with_emoji = "🍽️ За ресторан"
-                elif details == "За такси":
-                    details_with_emoji = "🚕 За такси"
-                elif details == "На подарок":
-                    details_with_emoji = "🎁 На подарок" 
-                elif details == "Возврат долга":
-                    details_with_emoji = "💰 Возврат долга"
-                elif details == "На карманные расходы":
-                    details_with_emoji = "💸 На карманные расходы"
-                    
-                notification_text += f"\nСообщение: {details_with_emoji}"
-
-            send_telegram_notification(recipient_chat_id, notification_text)
-            logger.info(f"Уведомление отправлено получателю {recipient_username}")
-
-        # Отправляем уведомление тому, кто оплатил
-        if telegram_tag:
-            payer_tag = telegram_tag.lstrip('@')
-            payer_chat_id = get_chat_by_username(payer_tag)
-            if payer_chat_id:
-                success_text = f"✅ Перевод @{recipient_username} успешен!\n"
-                send_telegram_notification(payer_chat_id, success_text)
-                logger.info(f"Уведомление отправлено отправителю {payer_tag}")
-
-    except Exception as e:
-        logger.error(f"Ошибка отправки уведомлений: {str(e)}")
 
 @app.get("/get_transfer_by_link/{id_link}", response_model=TransferResponse)
 def get_transfer_by_link(id_link: str):

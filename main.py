@@ -18,8 +18,8 @@ def run_bot():
 def run_api():
     """Запуск FastAPI"""
     try:
-        logger.info("🚀 Starting FastAPI on http://193.33.153.154:8000")
-        uvicorn.run(app, host="193.33.153.154", port=8000, log_level="info")
+        logger.info("🚀 Starting FastAPI on http://localhost:8000")
+        uvicorn.run(app, host="localhost", port=8000, log_level="info")
     except Exception as e:
         logger.error(f"API error: {e}")
 
@@ -27,6 +27,6 @@ if __name__ == '__main__':
     # Запускаем бота в отдельном потоке
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
-    
+
     # Запускаем API в главном потоке
     run_api()
