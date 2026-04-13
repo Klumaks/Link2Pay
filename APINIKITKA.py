@@ -369,7 +369,7 @@ def create_payment_link(request: CreateLinkRequest):
             link_id = cursor.fetchone()[0]
             conn.commit()
 
-            return f"http://212.233.98.238:8001/main_sdk.html?id={link_id}"
+            return f"http://185.92.181.84:8001/main_sdk.html?id={link_id}"
 
     except Exception as e:
         if conn:

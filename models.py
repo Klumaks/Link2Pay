@@ -5,7 +5,7 @@ from database import db
 import json
 from urllib.parse import quote_plus
 
-APINIKITKA_BASE_URL = '212.233.98.238:8000''  # Замените на ваш URL API
+APINIKITKA_BASE_URL = '185.92.181.84:8000''  # Замените на ваш URL API
 
 def clean_message_for_api(message: str) -> str:
     """Очищает сообщение от эмодзи для API"""

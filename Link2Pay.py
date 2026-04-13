@@ -1,25 +1,15 @@
+import os
+import re
 import telebot
 from telebot import types
 from dotenv import load_dotenv
-import socks  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
-import os
+
 from database import db, User
 from models import SendFlow, RequestFlow, registr_account_by_phone, checkDisposable, get_transfer_info, get_confirm
 
 from urllib.parse import urlparse, parse_qs
 
-# Загружаем переменные окружения
 load_dotenv()
-
-# НАСТРОЙКА ПРОКСИ (правильный способ для telebot)
-from telebot import apihelper
-
-# Настройка прокси для всех запросов telebot
-apihelper.proxy = {
-    'https': 'socks5://dd4482437e89f9af8929514eee7faaf61f@proxy99.madapp.cc:443'
-}
-
-# Создаем бота
 bot = telebot.TeleBot(os.getenv('TELEGRAM_BOT_TOKEN'))
 BOT_USERNAME = bot.get_me().username
 
@@ -150,8 +140,7 @@ def confirm_reg(call: types.CallbackQuery):
             phone= "8" + phone[2:]
         elif phone.startswith("7"):
             phone= "8" + phone[1:]
-        user = User(chat_id=cid, username=u.username or '', name=name, phone=phone,
-    messenger_type='telegram' )
+        user = User(chat_id=cid, username=u.username or '', name=name, phone=phone)
         db.save_user(user)
         registr_account_by_phone(phone, name)
         awaiting_reg.discard(cid)
