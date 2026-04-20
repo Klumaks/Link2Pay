@@ -1,0 +1,117 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+
+ENV/
+
+.venv
+
+# Virtual Environment
+venv/
+venv/bin/
+venv/include/
+venv/lib/
+venv/lib64/
+venv/pyvenv.cfg
+venv/share/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Project specific
+advertisement.jpg
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# WSL specific
+.wslconfig
+*.wsl
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Config files with sensitive data
+config.ini
+secrets.json
+credentials.json
+
+# Uploads
+uploads/
+downloads/
+temp/
+tmp/
+
+# Node modules (если появятся)
+node_modules/
+package-lock.json
+
+# Docker
+*.dockerignore
+Dockerfile
+docker-compose*.yml
+.docker/
+
+# Redis
+dump.rdb
+
+# PostgreSQL
+*.pgdata
+*.sql
+!opkc.sql
+!link2pay.sql
+
+# FastAPI
+*.db
+*.sqlite
